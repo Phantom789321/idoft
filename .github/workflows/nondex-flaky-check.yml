@@ -1,0 +1,42 @@
+name: Confirm Flaky Test with NonDex
+
+on:
+  workflow_dispatch:
+
+jobs:
+  nondex-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Clone target project
+        run: |
+          git clone https://github.com/apache/jackrabbit-oak.git
+          cd jackrabbit-oak
+          git checkout 0440e096dc7a460d206c77a5f178796db31a0ef4
+
+      - name: Build module
+        run: |
+          cd jackrabbit-oak
+          mvn clean install -DskipTests -pl oak-auth-ldap -am \
+            -Denforcer.skip=true -Dlicense.skip=true -Dcheckstyle.skip=true -Drat.skip=true
+
+      - name: Run test normally
+        run: |
+          cd jackrabbit-oak
+          mvn -pl oak-auth-ldap test \
+            -Dtest=org.apache.jackrabbit.oak.security.authentication.ldap.TokenDefaultLdapLoginModuleTest#testReLogin
+
+      - name: Run test with NonDex
+        run: |
+          cd jackrabbit-oak
+          mvn -pl oak-auth-ldap edu.illinois:nondex-maven-plugin:2.1.1:nondex \
+            -Dtest=org.apache.jackrabbit.oak.security.authentication.ldap.TokenDefaultLdapLoginModuleTest#testReLogin \
+            -DnondexRuns=30
